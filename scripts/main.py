@@ -1,13 +1,13 @@
-# Importing needed packages
 import os
+import sys
 import glob
-import csv
+import shlex
+import shutil
 import socket
+import subprocess
 
-host_name = socket.gethostname()
-host_ip = socket.gethostbyname(host_name)
-
-# Displaying PowerBash logo
+HOME = os.path.expanduser('~')
+returnError = lambda text: print(f"\033[91m{text}\033[0m")
 print("""
 ██████╗░░█████╗░░██╗░░░░░░░██╗███████╗██████╗░██████╗░░█████╗░░██████╗██╗░░██╗
 ██╔══██╗██╔══██╗░██║░░██╗░░██║██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║░░██║
@@ -15,75 +15,89 @@ print("""
 ██╔═══╝░██║░░██║░░████╔═████║░██╔══╝░░██╔══██╗██╔══██╗██╔══██║░╚═══██╗██╔══██║
 ██║░░░░░╚█████╔╝░░╚██╔╝░╚██╔╝░███████╗██║░░██║██████╦╝██║░░██║██████╔╝██║░░██║
 ╚═╝░░░░░░╚════╝░░░░╚═╝░░░╚═╝░░╚══════╝╚═╝░░╚═╝╚═════╝░╚═╝░░╚═╝╚═════╝░╚═╝░░╚═╝
-""")
+""".strip())
+os.chdir(HOME)
 
-
-# Defining 'run_command()' function and make it run commands
-def run_command():
-    tmp = list(command)
-    tmp1 = []
-    for item in tmp:
-        if item != "\\":
-            tmp1.append(item)
-        else:
-            tmp1.append("escape")
-    for item in tmp1:
-        if item == "escape":
-            i = tmp1.index(item)
-            del tmp1[i]
-            del tmp1[i]
-    command_list = "".join(tmp1).split()
-    del tmp, tmp1
-    print(command_list)
-
-    # 'exit' command
-    if command == "exit":
-        exit()
-
-    # 'hostname' command
-    elif command == "hostname":
-        print(host_name)
-
-    # 'hostip' command
-    elif command == "hostip":
-        print(host_ip)
-
-    # 'ls' command
-    elif command == "ls":
-        path = input("Enter the path to list the folders and files in: ")
-        if not path.endswith('/'):
-            path = f'{path}/'
-        folders = glob.glob(f'{path}*/')
-        for folder in folders:
-            print(folder[len(path):])
-        for file in glob.glob(f'{path}*'):
-            if os.path.isfile(file):
-                print(file[len(path):])
-
-    # 'cp' or 'copy' command
-    elif command == "cp" or command == "copy":
-        original_path = input("Enter the path of the file you want to copy: ")
-        copy_to = input("Enter the path where you want to copy it to: ")
-        os.system(f'cp {original_path} {copy_to}')
-
-    # 'mv' or 'move' command
-    elif command == "mv" or command == "move":
-        original_path = input("Enter the path of the file you want to move: ")
-        move_to = input("Enter the path where you want to move it to: ")
-        os.system(f'mv {original_path} {move_to}')
-
-    elif command == "rn" or command == "ren" or command == "rename":
-        path = input("Enter the path of the folder the file you want to rename is located in: ")
-        original_name = input("Enter the original name of the file you want to rename: ")
-        new_name = input("Enter the new name of the file you want to rename: ")
-        os.system(f'cd {path} && mv {original_name} {new_name}')
-
-    # Error message when command not found
-    else:
-        print(f"Sorry, the command \"{command}\" is not recognised as a command!")
-
-
-# Allowing the users to run commands
 while True:
-    command = input(">>> ")
-    run_command()
+    try:
+        print('\n'+os.getcwd())
+        tokens = shlex.split(input(">>> "))
+        if not tokens: continue
+        command, *args = tokens
+        match command:
+            case "echo":
+                print(' '.join(args))
+            case "cls" | "clear":
+                match len(args):
+                    case 0: os.system('cls' if os.name == 'nt' else 'clear')
+                    case _: returnError("Too many arguments! Expected None.")
+            case "pwd":
+                match len(args):
+                    case 0: print(os.getcwd()))
+                    case _: returnError("Too many arguments! Expected None.")
+            case "hostname":
+                match len(args):
+                    case 0: print(socket.gethostname())
+                    case _: returnError("Too many arguments! Expected None.") 
+            case "hostip":
+                match len(args):
+                    case 0: print(socket.gethostbyname(socket.gethostname()))
+                    case _: returnError("Too many arguments! Expected None.")
+            case "exit":
+                match len(args):
+                    case 0: sys.exit()
+                    case 1: sys.exit(args[0])
+                    case _: returnError("Too many arguments! Expected 1 or less.") 
+            case "cd":
+                match len(args):
+                    case 0: os.chdir(HOME)
+                    case 1: os.chdir(args[0])
+                    case _: returnError("Too many arguments! Expected 1 or less.")
+            case "ls":
+                match len(args):
+                    case 0: path = os.getcwd()
+                    case 1:
+                        if os.path.exists(args[0]):
+                            path = args[0]
+                        else:
+                            returnError(f"ERROR: Path not found: '{args[0]}")
+                            continue
+                    case _: returnError("Too many arguments! Expected 1 or less.")
+                if not path.endswith(os.sep): path += os.sep
+                items = glob.glob(f'{path}*')
+                items.sort(key = lambda item: not os.path.isdir(item))
+                print('\n'.join([f"{item[len(path):]}/" if os.path.isdir(item) else item[len(path):] for item in items]))
+            case "cp" | "copy":
+                match len(args):
+                    case 0:
+                        src = input("Source: ")
+                        dst = input("Destination: ")
+                    case 1:
+                        src = args[0]
+                        dst = input("Destination: ")
+                    case 2: src, dst = args
+                    case _: returnError("Too many arguments! Expected 2 or less.")
+                shutil.copy(src, dst) if os.path.isfile(src) else shutil.copytree(src, dst)
+            case "mv" | "move":
+                match len(args):
+                    case 0:
+                        src = input("Source: ")
+                        dst = input("Destination: ")
+                    case 1:
+                        src = args[0]
+                        dst = input("Destination: ")
+                    case 2:
+                        src, dst = args
+                    case _:
+                        returnError("Too many arguments! Expected 2 or less.")
+                shutil.move(src, dst)
+            case _:
+                if shutil.which(command):
+                    os.system(f"{command} {' '.join(args)}")
+                else:
+                    returnError(f"ERROR: {command} is not recognised as a command or executable!")
+    except (KeyboardInterrupt, EOFError):
+        print("Use 'exit' to exit")
+        continue
+    except Exception as e:
+        returnError(f"ERROR: {e}")
